@@ -1,0 +1,20 @@
+{
+  "name": "wardogs-bot-ai",
+  "version": "1.0.0",
+  "description": "Official WARDOGS Discord AI helper. Uses Discord Bot API only.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "ingest": "node src/ingest-now.js",
+    "ingest:web": "node src/ingest-web.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.22.1",
+    "dotenv": "^16.4.7"
+  }
+}
