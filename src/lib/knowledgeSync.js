@@ -27,6 +27,21 @@ function usableText(text) {
   return true;
 }
 
+function walkComponents(node, bits) {
+  if (!node) return;
+  if (Array.isArray(node)) {
+    for (const item of node) walkComponents(item, bits);
+    return;
+  }
+  if (typeof node !== 'object') return;
+  for (const key of ['content', 'label', 'title', 'description', 'placeholder']) {
+    if (typeof node[key] === 'string' && node[key].trim()) bits.push(node[key].trim());
+  }
+  walkComponents(node.components, bits);
+  walkComponents(node.items, bits);
+  walkComponents(node.accessory, bits);
+}
+
 function messageToText(message) {
   if (!message) return '';
   const bits = [message.content];
@@ -37,6 +52,7 @@ function messageToText(message) {
       bits.push(`${field.name}: ${field.value}`);
     }
   }
+  walkComponents(message.components, bits);
   for (const file of message.attachments?.values?.() || []) {
     if (file.name) bits.push(`[файл: ${file.name}]`);
   }

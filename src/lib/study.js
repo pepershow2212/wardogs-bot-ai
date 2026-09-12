@@ -12,6 +12,16 @@ export function canTrainBot(member) {
   return Boolean(member?.permissions?.has?.(PermissionFlagsBits.ManageGuild));
 }
 
+function findGuideChannels(guild, exceptId = '') {
+  if (!guild) return [];
+  return [...guild.channels.cache.values()].filter((channel) => {
+    if (!channel || channel.id === exceptId) return false;
+    if (skipChannel(channel)) return false;
+    if (channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildCategory) return false;
+    return /база.?знан|knowledge|гайд|zapret|запрет|faq/i.test(channel.name || '');
+  });
+}
+
 function titlesFrom(text) {
   return [...String(text || '').matchAll(/^###\s+(.+)$/gm)].map((item) => item[1].trim()).filter(Boolean).slice(0, 15);
 }
@@ -36,9 +46,9 @@ export async function resolveStudyTargets(guild, message, text = '') {
     add(channel);
   }
 
-  if (found.size === 0 && /база|гайд|faq|knowledge/i.test(String(text || ''))) {
+  if (found.size === 0 && /база|гайд|faq|knowledge|подключ|zapret|запрет/i.test(String(text || ''))) {
     for (const channel of guild.channels.cache.values()) {
-      if (/база|гайд|faq|knowledge/i.test(channel.name || '')) add(channel);
+      if (/база|гайд|faq|knowledge|подключ|zapret|запрет/i.test(channel.name || '')) add(channel);
     }
   }
 
@@ -58,7 +68,7 @@ function studyAccessProblem(channel) {
   return null;
 }
 
-export async function studyChannel(channel) {
+export async function studyChannel(channel, { allowFallback = true } = {}) {
   if (!channel) {
     return { ok: false, reply: 'Не вижу канал.' };
   }
@@ -76,10 +86,25 @@ export async function studyChannel(channel) {
     body = await collectPinsAndRecent(channel, { recentLimit: 50, includeBots: true });
   }
 
-  if (!body || body.length < 20) {
+  if (!body || body.length < 80) {
+    if (allowFallback) {
+      const guides = findGuideChannels(channel.guild, channel.id);
+      if (guides.length) {
+        const parts = [
+          `<#${channel.id}> почти пустой (приветствие / виджет серверов). Гайды подключения в другом месте — читаю их.`,
+        ];
+        let any = false;
+        for (const guide of guides.slice(0, 2)) {
+          const result = await studyChannel(guide, { allowFallback: false });
+          parts.push(result.reply);
+          if (result.ok) any = true;
+        }
+        return { ok: any, reply: parts.join('\n\n') };
+      }
+    }
     return {
       ok: false,
-      reply: `В «${channel.name}» пусто с моей стороны: нет постов, которые я вижу. Если это форум — должны быть открытые ветки. Если гайд кидал бот — я теперь его тоже читаю, повтори /study.`,
+      reply: `«${channel.name}» пустой. Нужен форум с гайдами, обычно #база-знаний. Укажи его в /study.`,
     };
   }
 
