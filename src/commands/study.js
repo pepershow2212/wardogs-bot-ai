@@ -20,6 +20,7 @@ export default {
           ChannelType.GuildText,
           ChannelType.GuildForum,
           ChannelType.GuildAnnouncement,
+          ChannelType.GuildMedia,
           ChannelType.PublicThread,
         )
         .setRequired(true),

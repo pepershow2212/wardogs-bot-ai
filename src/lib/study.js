@@ -45,6 +45,19 @@ export async function resolveStudyTargets(guild, message, text = '') {
   return [...found.values()].slice(0, 3);
 }
 
+function studyAccessProblem(channel) {
+  const me = channel.guild?.members?.me;
+  if (!me) return 'Не вижу себя на сервере. Перепригласи WARDOGS AI.';
+  const perms = channel.permissionsFor(me);
+  if (!perms?.has(PermissionFlagsBits.ViewChannel)) {
+    return `Меня не пускает в «${channel.name}». В правах канала добавь WARDOGS AI: Просмотр канала.`;
+  }
+  if (!perms.has(PermissionFlagsBits.ReadMessageHistory)) {
+    return `Вижу «${channel.name}», но не историю сообщений. Выдай WARDOGS AI: Читать историю сообщений.`;
+  }
+  return null;
+}
+
 export async function studyChannel(channel) {
   if (!channel) {
     return { ok: false, reply: 'Не вижу канал.' };
@@ -53,17 +66,20 @@ export async function studyChannel(channel) {
     return { ok: false, reply: 'Этот канал служебный, его не читаю.' };
   }
 
+  const access = studyAccessProblem(channel);
+  if (access) return { ok: false, reply: access };
+
   let body = '';
   if (isForum(channel)) {
-    body = await collectForum(channel, { replies: true, threadLimit: 40 });
+    body = await collectForum(channel, { replies: true, threadLimit: 50, includeBots: true });
   } else {
-    body = await collectPinsAndRecent(channel, { recentLimit: 25 });
+    body = await collectPinsAndRecent(channel, { recentLimit: 50, includeBots: true });
   }
 
   if (!body || body.length < 20) {
     return {
       ok: false,
-      reply: `В «${channel.name}» почти ничего не прочитал. Нужны права View Channel и Read Message History.`,
+      reply: `В «${channel.name}» пусто с моей стороны: нет постов, которые я вижу. Если это форум — должны быть открытые ветки. Если гайд кидал бот — я теперь его тоже читаю, повтори /study.`,
     };
   }
 

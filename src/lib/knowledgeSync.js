@@ -37,6 +37,9 @@ function messageToText(message) {
       bits.push(`${field.name}: ${field.value}`);
     }
   }
+  for (const file of message.attachments?.values?.() || []) {
+    if (file.name) bits.push(`[файл: ${file.name}]`);
+  }
   return bits.filter(Boolean).join('\n').replace(/\s+\n/g, '\n').trim();
 }
 
@@ -88,7 +91,7 @@ export function isForumChannel(channel) {
   return isForum(channel);
 }
 
-export async function collectPinsAndRecent(channel, { recentLimit = 8 } = {}) {
+export async function collectPinsAndRecent(channel, { recentLimit = 8, includeBots = false } = {}) {
   const chunks = [];
   const pins = await channel.messages.fetchPinned().catch(() => null);
   if (pins) {
@@ -103,7 +106,7 @@ export async function collectPinsAndRecent(channel, { recentLimit = 8 } = {}) {
     if (recent) {
       for (const message of [...recent.values()].reverse()) {
         if (pins?.has(message.id)) continue;
-        if (message.author?.bot && !message.webhookId) continue;
+        if (!includeBots && message.author?.bot && !message.webhookId) continue;
         const text = messageToText(message);
         if (text && usableText(text)) chunks.push(text);
       }
@@ -113,10 +116,12 @@ export async function collectPinsAndRecent(channel, { recentLimit = 8 } = {}) {
   return chunks.join('\n\n').trim();
 }
 
-export async function collectForum(channel, { replies = true, threadLimit = 24 } = {}) {
+export async function collectForum(channel, { replies = true, threadLimit = 24, includeBots = false } = {}) {
   const parts = [];
   const active = await channel.threads.fetchActive().catch(() => null);
-  const archived = await channel.threads.fetchArchived({ fetchAll: false, limit: 25 }).catch(() => null);
+  const archived = await channel.threads.fetchArchived({ fetchAll: true, limit: 40 }).catch(() =>
+    channel.threads.fetchArchived({ fetchAll: false, limit: 25 }).catch(() => null),
+  );
   const threads = [
     ...((active && [...active.threads.values()]) || []),
     ...((archived && [...archived.threads.values()]) || []),
@@ -129,18 +134,18 @@ export async function collectForum(channel, { replies = true, threadLimit = 24 }
     const starterText = messageToText(starter);
     if (starterText && usableText(starterText)) bits.push(starterText);
     if (replies) {
-      const extra = await thread.messages.fetch({ limit: 4 }).catch(() => null);
+      const extra = await thread.messages.fetch({ limit: includeBots ? 12 : 4 }).catch(() => null);
       if (extra) {
         for (const message of [...extra.values()].reverse()) {
           if (starter && message.id === starter.id) continue;
-          if (message.author?.bot) continue;
+          if (!includeBots && message.author?.bot) continue;
           const text = messageToText(message);
           if (text && usableText(text)) bits.push(text);
         }
       }
     }
     const block = bits.join('\n').trim().slice(0, MAX_THREAD_CHARS);
-    if (block.length > 20) parts.push(block);
+    if (block.length > 8) parts.push(block);
   }
 
   return parts.join('\n\n').trim();
